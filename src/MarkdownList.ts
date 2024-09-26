@@ -89,11 +89,11 @@ export class MarkdownLinks {
   }
 }
 
-const md = new MarkdownLinks();
+// const md = new MarkdownLinks();
 
 //  md.mdLinks('conLinksRaiz.md', true)
-md.mdLinks('directorio', true)
-  .then(result => console.log('este es el resultado', result))
-  .catch(error => {
-    console.error('este es el error: ', error)
-  })
+// md.mdLinks('directorio', true)
+//   .then(result => console.log('este es el resultado', result))
+//   .catch(error => {
+//     console.error('este es el error: ', error)
+//   })

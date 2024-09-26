@@ -1,79 +1,86 @@
-import { FileValidator, FileReader, LinkExtractor } from './ModularizedFunctions.js';
+import { PathValidator, FileProcess, FileValidator, LinkProcess } from './ModularizedFunctions.js';
 export class MarkdownLinks {
-    mdLinks(inputPath) {
+    mdLinks(inputPath, validate = false) {
         return new Promise(async (resolve, reject) => {
             try {
                 // Convierte la ruta en absoluta
-                const absolutePath = FileValidator.toAbsolutePath(inputPath);
+                const absolutePath = PathValidator.toAbsolutePath(inputPath);
                 // Verifica si el archivo existe y si es un archivo Markdown
-                const isFileExisted = await FileValidator.fileExists(absolutePath);
-                const isMdFile = FileValidator.isMarkdownFile(absolutePath);
-                if (!isFileExisted || !isMdFile) {
-                    return reject(new Error('Error al leer el archivo: No existe o no es un archivo Markdown válido'));
+                const isExistingPath = await PathValidator.pathExists(absolutePath);
+                if (!isExistingPath) {
+                    return reject(new Error('La ruta no existe'));
                 }
-                // Lee el contenido del archivo y extrae los links
-                const data = await FileReader.readFile(absolutePath);
-                const extractedDataLinks = LinkExtractor.extractLinks(data, absolutePath);
-                resolve(extractedDataLinks); // Resolución de la promesa con los links extraídos
-            }
-            catch (error) {
-                // Verificación de tipo para asegurar que 'error' es un objeto Error
-                if (error instanceof Error) {
-                    reject(new Error(`Error procesando el archivo: ${error.message}`));
+                if (PathValidator.isDirectory(absolutePath)) {
+                    const allLinks = [];
+                    // Obtenemos todos los archivos del directorio
+                    const files = PathValidator.getDirectoryFiles(absolutePath);
+                    // console.log('lineaa 29', files)
+                    // [
+                    //  '/Users/meryvera/Desktop/dev/projects/node-library/directorio/conLinks2Dir.md',
+                    //  '/Users/meryvera/Desktop/dev/projects/node-library/directorio/conLinksDir.md',
+                    //  '/Users/meryvera/Desktop/dev/projects/node-library/directorio/directorio2',
+                    //  '/Users/meryvera/Desktop/dev/projects/node-library/directorio/sinLinksDir.md'
+                    // ]
+                    for (const filePath of files) {
+                        // console.log('linea 31', filePath)
+                        // /Users/meryvera/Desktop/dev/projects/node-library/directorio/conLinks2Dir.md
+                        // /Users/meryvera/Desktop/dev/projects/node-library/directorio/conLinksDir.md
+                        // /Users/meryvera/Desktop/dev/projects/node-library/directorio/directorio2
+                        // /Users/meryvera/Desktop/dev/projects/node-library/directorio/sinLinksDir.md
+                        if (PathValidator.isDirectory(filePath)) {
+                            // console.info(`Omitiendo subdirectorio: ${filePath}`);
+                            continue; // Saltar directorios
+                        }
+                        if (FileValidator.isMarkdownFile(filePath)) {
+                            const fileLinks = await this.#processFile(filePath, validate);
+                            // console.log('fileLinkssss', fileLinks)
+                            allLinks.push(...fileLinks); // Agregamos todos los links encontrados
+                        }
+                    }
+                    // console.log('allll links', allLinks)
+                    resolve(allLinks);
+                }
+                else if (FileValidator.isMarkdownFile(absolutePath)) {
+                    // Si es un archivo .md, lo procesamos directamente
+                    const fileLinks = await this.#processFile(absolutePath, validate);
+                    resolve(fileLinks);
                 }
                 else {
-                    reject(new Error('Error desconocido al procesar el archivo'));
+                    reject(new Error('El archivo no es un archivo Markdown válido'));
+                }
+            }
+            catch (error) {
+                if (error instanceof Error) {
+                    reject(new Error(`Error procesando el archivo o directorio: ${error.message}`));
+                }
+                else {
+                    reject(new Error('Error desconocido al procesar el archivo o directorio'));
                 }
             }
         });
     }
+    async #processFile(filePath, validate) {
+        try {
+            const data = await FileProcess.readFile(filePath);
+            const extractedLinks = LinkProcess.extractLinks(data, filePath);
+            // Verificamos si se encontró algún link
+            if (!extractedLinks.length)
+                return [];
+            if (validate) {
+                const validatedLinks = await LinkProcess.validateLinks(extractedLinks);
+                return validatedLinks;
+            }
+            return extractedLinks;
+        }
+        catch (error) {
+            throw new Error(`Error procesando el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+        }
+    }
 }
 const md = new MarkdownLinks();
-md.mdLinks('conLinksRaiz.md')
-    .then(result => console.log('este es el resultado', result))
-    .catch(error => {
-    console.error('este es el error: ', error);
-});
-// mdLinks(): Promise<Link[]> {
-//   return new Promise((resolve, reject) => {
-//     fs.readFile(this.#absolutePath, 'utf-8', (err, data)=> {    // data y err son string
-//       // if(err) return reject(`Error 1 - al leer el archivo: ${err}`)
-//       // if(err) return reject(new Error(`Error 2 - al leer el archivo: ${err}`))
-//       if(err) return reject(new Error(`Error al leer el archivo: ${err.message}`, { cause: err }));
-//       const { extractLinks } = new ModularizedFunctions()
-//       const links = extractLinks(data, this.#absolutePath)
-//       resolve(links)
-//     })
+//  md.mdLinks('conLinksRaiz.md', true)
+// md.mdLinks('directorio', true)
+//   .then(result => console.log('este es el resultado', result))
+//   .catch(error => {
+//     console.error('este es el error: ', error)
 //   })
-// }
-// async mdLinks(): Promise<Link[]> {
-//   const { extractLinks, validateMarkdownFile, fileExists } = new ModularizedFunctions()
-//   const isFileExisting =  await fileExists(this.#absolutePath)
-//   try {
-//     if(isFileExisting) {
-//       validateMarkdownFile(this.#absolutePath)
-//     } else {
-//       throw new Error('El file no existe. Por favor revisa el nombre de tu file');
-//     };
-//     const data = await fs.readFile(this.#absolutePath, 'utf-8');
-//     return extractLinks(data, this.#absolutePath)
-//   } catch (error) {
-//     const errorMessage = (error instanceof Error) ? error.message : 'Error desconocido';
-//     return Promise.reject(new Error(`Error al procesar el archivo: ${errorMessage}`));
-//   }
-// }
-// export class MarkdownLinks {
-//   constructor(){}
-//   async mdLinks(inputPath: string): Promise<Link[]> {
-//     const { toAbsolutePath, extractLinks,readRawFile, isMarkdownFile, fileExists } = new ModularizedFunctions()
-//     let absolute = toAbsolutePath(inputPath);
-//     let isFileExisted = await fileExists(absolute)
-//     let isMdFile = isMarkdownFile(absolute)
-//     let data = await readRawFile(absolute)
-//     return new Promise((resolve, reject) => {
-//       if(!isFileExisted || !isMdFile || !data) return reject(new Error('Error al leer el archivo:'));
-//       let extratedDataLinks = extractLinks(data, absolute)
-//       resolve(extratedDataLinks)
-//     })
-//   }
-// }
